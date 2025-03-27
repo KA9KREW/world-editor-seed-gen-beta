@@ -201,6 +201,9 @@ export function generateHytopiaWorld(settings, seedNum, blockTypes, progressCall
     seed: seedNum + 7 
   });
   
+  // Add temperature offset based on slider
+  const temperatureOffset = (settings.temperature || 0.5) - 0.5; // Convert 0-1 to -0.5 to 0.5
+  
   const humidityMap = generatePerlinNoise(settings.width, settings.length, { 
     octaveCount: 1, 
     scale: 0.005, 
@@ -263,19 +266,35 @@ export function generateHytopiaWorld(settings, seedNum, blockTypes, progressCall
   for (let z = 0; z < settings.length; z++) {
     for (let x = 0; x < settings.width; x++) {
       const index = z * settings.width + x;
-      const temp = tempMap[index];
+      const temp = tempMap[index] + temperatureOffset; // Apply temperature offset
       const humidity = humidityMap[index];
       
-      if (temp < 0.3 && humidity < 0.5) {
-        biomeMap[index] = 'desert';
+      // Temperature-based biome selection (similar to Minecraft)
+      if (temp < 0.2) {
+        // Cold biomes
+        if (humidity < 0.3) biomeMap[index] = 'snowy_plains';
+        else if (humidity < 0.6) biomeMap[index] = 'snowy_forest';
+        else biomeMap[index] = 'snowy_taiga';
+      } else if (temp < 0.4) {
+        // Cool biomes
+        if (humidity < 0.3) biomeMap[index] = 'plains';
+        else if (humidity < 0.6) biomeMap[index] = 'forest';
+        else biomeMap[index] = 'taiga';
       } else if (temp < 0.6) {
-        biomeMap[index] = 'plains';
-      } else if (temp < 0.8 && humidity > 0.6) {
-        biomeMap[index] = 'forest';
-      } else if (temp > 0.6 && humidity < 0.4) {
-        biomeMap[index] = 'savanna';
+        // Temperate biomes
+        if (humidity < 0.3) biomeMap[index] = 'plains';
+        else if (humidity < 0.6) biomeMap[index] = 'forest';
+        else biomeMap[index] = 'swamp';
+      } else if (temp < 0.8) {
+        // Warm biomes
+        if (humidity < 0.3) biomeMap[index] = 'savanna';
+        else if (humidity < 0.6) biomeMap[index] = 'jungle';
+        else biomeMap[index] = 'swamp';
       } else {
-        biomeMap[index] = 'plains';
+        // Hot biomes
+        if (humidity < 0.3) biomeMap[index] = 'desert';
+        else if (humidity < 0.6) biomeMap[index] = 'savanna';
+        else biomeMap[index] = 'jungle';
       }
     }
   }
@@ -344,14 +363,16 @@ export function generateHytopiaWorld(settings, seedNum, blockTypes, progressCall
             terrainData[`${worldX},${y},${worldZ}`] = blockTypes.stone; // Deep terrain
           } else if (y < surfaceHeight) {
             // Transition layers
-            if (biome === 'desert') {
-              terrainData[`${worldX},${y},${worldZ}`] = Math.random() < 0.3 ? 
-                blockTypes.sandstone : blockTypes.sand;
+            if (biome === 'desert' || biome === 'savanna') {
+              terrainData[`${worldX},${y},${worldZ}`] = blockTypes.sand;
+            } else if (biome === 'snowy_plains' || biome === 'snowy_forest' || biome === 'snowy_taiga') {
+              terrainData[`${worldX},${y},${worldZ}`] = blockTypes.snow;
+            } else if (biome === 'ocean' && y < worldSettings.seaLevel) {
+              terrainData[`${worldX},${y},${worldZ}`] = blockTypes.gravel; // Underwater surface
             } else {
-              // Add rocky features near the surface
+              // Add occasional cobblestone outcrops on the surface
               const rockValue = rockNoise[z * settings.width + x];
-              if (rockValue > 0.7 && y >= surfaceHeight - 2) {
-                // Create rocky outcrops with cobblestone
+              if (rockValue > 0.8) {
                 terrainData[`${worldX},${y},${worldZ}`] = blockTypes.cobblestone;
               } else {
                 terrainData[`${worldX},${y},${worldZ}`] = blockTypes.dirt;
@@ -360,6 +381,8 @@ export function generateHytopiaWorld(settings, seedNum, blockTypes, progressCall
           } else { // Surface block
             if (biome === 'desert' || biome === 'savanna') {
               terrainData[`${worldX},${y},${worldZ}`] = blockTypes.sand;
+            } else if (biome === 'snowy_plains' || biome === 'snowy_forest' || biome === 'snowy_taiga') {
+              terrainData[`${worldX},${y},${worldZ}`] = blockTypes.snow;
             } else if (biome === 'ocean' && y < worldSettings.seaLevel) {
               terrainData[`${worldX},${y},${worldZ}`] = blockTypes.gravel; // Underwater surface
             } else {
@@ -1058,6 +1081,8 @@ export function generateHytopiaWorld(settings, seedNum, blockTypes, progressCall
           treeProbability = 0.2;
         } else if (biome === 'savanna') {
           treeProbability = 0.3;
+        } else if (biome === 'snowy_plains' || biome === 'snowy_forest' || biome === 'snowy_taiga') {
+          treeProbability = 0.4; // Add tree probability for snowy biomes
         }
         
         // Check if we should place a tree here
@@ -1068,6 +1093,8 @@ export function generateHytopiaWorld(settings, seedNum, blockTypes, progressCall
             treeHeight = 4 + Math.floor(Math.random() * 3);
           } else if (biome === 'savanna') {
             treeHeight = 5 + Math.floor(Math.random() * 2);
+          } else if (biome === 'snowy_plains' || biome === 'snowy_forest' || biome === 'snowy_taiga') {
+            treeHeight = 3 + Math.floor(Math.random() * 3); // Slightly shorter trees for snowy biomes
           }
           
           // Check if there's enough space for a tree
@@ -1080,9 +1107,23 @@ export function generateHytopiaWorld(settings, seedNum, blockTypes, progressCall
           }
           
           if (canPlaceTree) {
-            // Place trunk
+            // Place trunk - use poplar log only for snowy biomes
+            const logType = (biome === 'snowy_plains' || biome === 'snowy_forest' || biome === 'snowy_taiga') 
+              ? blockTypes['poplar log'] 
+              : blockTypes.log;
+              
+            // Debug logging
+            if (biome === 'snowy_plains' || biome === 'snowy_forest' || biome === 'snowy_taiga') {
+              console.log('Snowy biome tree:', {
+                biome,
+                poplarLogId: blockTypes['poplar log'],
+                logId: blockTypes.log,
+                usingLogType: logType
+              });
+            }
+            
             for (let ty = 1; ty <= treeHeight; ty++) {
-              terrainData[`${worldX},${surfaceHeight + ty},${worldZ}`] = blockTypes.log;
+              terrainData[`${worldX},${surfaceHeight + ty},${worldZ}`] = logType;
               blocksCount++;
             }
             
@@ -1091,6 +1132,8 @@ export function generateHytopiaWorld(settings, seedNum, blockTypes, progressCall
             let leafRadius = 2;
             if (biome === 'savanna') {
               leafRadius = 3; // Wider canopy for savanna
+            } else if (biome === 'snowy_plains' || biome === 'snowy_forest' || biome === 'snowy_taiga') {
+              leafRadius = 2; // Standard canopy for snowy trees
             }
             
             for (let ly = treeHeight - 1; ly <= treeHeight + 1; ly++) {
@@ -1108,7 +1151,11 @@ export function generateHytopiaWorld(settings, seedNum, blockTypes, progressCall
                   if (dist <= layerRadius || (dist <= layerRadius + 0.5 && Math.random() < 0.5)) {
                     const leafKey = `${worldX + lx},${surfaceHeight + ly},${worldZ + lz}`;
                     if (!terrainData[leafKey]) {
-                      terrainData[leafKey] = blockTypes['oak leaves'];
+                      // Use cold leaves for snowy biomes, oak leaves for all others
+                      const leafType = (biome === 'snowy_plains' || biome === 'snowy_forest' || biome === 'snowy_taiga')
+                        ? blockTypes['cold-leaves']
+                        : blockTypes['oak-leaves'];
+                      terrainData[leafKey] = leafType;
                       blocksCount++;
                     }
                   }
@@ -1126,7 +1173,11 @@ export function generateHytopiaWorld(settings, seedNum, blockTypes, progressCall
                   ly >= treeHeight - 1 && ly <= treeHeight + 1) {
                 const leafKey = `${worldX + lx},${surfaceHeight + ly},${worldZ + lz}`;
                 if (!terrainData[leafKey]) {
-                  terrainData[leafKey] = blockTypes['oak leaves'];
+                  // Use cold leaves for snowy biomes, oak leaves for all others
+                  const leafType = (biome === 'snowy_plains' || biome === 'snowy_forest' || biome === 'snowy_taiga')
+                    ? blockTypes['cold-leaves']
+                    : blockTypes['oak-leaves'];
+                  terrainData[leafKey] = leafType;
                   blocksCount++;
                 }
               }

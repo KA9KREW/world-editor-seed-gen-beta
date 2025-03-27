@@ -43,6 +43,7 @@ class SeedGeneratorTool extends BaseTool {
       waterLevel: 50, // This will map to seaLevel between 32-38
       terrainFlatness: 15,
       oreDensity: 50,
+      temperature: 50, // New temperature slider (0-100)
       generateOreDeposits: true,
       clearMap: true,
       mountainRange: 0 // New option for snow-capped mountain range
@@ -339,6 +340,10 @@ class SeedGeneratorTool extends BaseTool {
     terrainSection.appendChild(biomeSlider);
     
     uiContainer.appendChild(terrainSection);
+    
+    // Temperature slider
+    const temperatureSlider = this.createTemperatureSlider();
+    terrainSection.appendChild(temperatureSlider);
     
     // Cave & Ore Features section
     const caveSection = this.createFormSection('Cave & Ore Features');
@@ -971,6 +976,7 @@ class SeedGeneratorTool extends BaseTool {
       clearMap: options.clearMap || true,
       caveDensity: (options.caveDensity || 50) / 100, // Range 0 to 1.0
       biomeDiversity: 0.02 / (1 + ((options.biomeSize || 100) / 200)), // Range 0.01 to 0.05
+      temperature: (options.temperature || 50) / 100, // Convert 0-100 to 0-1
       
       // Transform mountain height to affect terrain in a more extreme way:
       // Low values (0-30): Create depressions/ocean basins (roughness 0.3 to 0.5)
@@ -1073,8 +1079,10 @@ class SeedGeneratorTool extends BaseTool {
       'water-flow': this.findBlockTypeId(blockTypesList, 'water'),
       lava: this.findBlockTypeId(blockTypesList, 'lava'),
       clay: this.findBlockTypeId(blockTypesList, 'clay'),
-      'oak leaves': this.findBlockTypeId(blockTypesList, 'oak-leaves'),
+      'oak-leaves': this.findBlockTypeId(blockTypesList, 'oak-leaves'),
+      'cold-leaves': this.findBlockTypeId(blockTypesList, 'cold-leaves'),
       log: this.findBlockTypeId(blockTypesList, 'log'),
+      'poplar log': this.findBlockTypeId(blockTypesList, 'poplar log'),
       sandstone: this.findBlockTypeId(blockTypesList, 'sandstone'),
       coal: this.findBlockTypeId(blockTypesList, 'coal-ore'),
       iron: this.findBlockTypeId(blockTypesList, 'iron-ore'),
@@ -1089,10 +1097,12 @@ class SeedGeneratorTool extends BaseTool {
       stone: blockTypes.stone,
       cobblestone: blockTypes.cobblestone,
       water: blockTypes['water-still'],
-      oakLeaves: blockTypes['oak leaves'],
+      oakLeaves: blockTypes['oak-leaves'],
       diamond: blockTypes.diamond,
       emerald: blockTypes.emerald,
-      clay: blockTypes.clay
+      clay: blockTypes.clay,
+      poplarLog: blockTypes['poplar log'],
+      log: blockTypes.log
     });
     
     // Show UI progress indicator
@@ -1241,6 +1251,38 @@ class SeedGeneratorTool extends BaseTool {
     } catch (error) {
       console.error('Error force saving terrain:', error);
     }
+  }
+  
+  /**
+   * Add temperature slider to the UI
+   */
+  createTemperatureSlider() {
+    const container = document.createElement('div');
+    container.className = 'slider-container';
+    
+    const label = document.createElement('label');
+    label.textContent = 'Temperature: ';
+    
+    const slider = document.createElement('input');
+    slider.type = 'range';
+    slider.min = '0';
+    slider.max = '100';
+    slider.value = this.generationOptions.temperature;
+    slider.className = 'slider';
+    
+    const valueDisplay = document.createElement('span');
+    valueDisplay.textContent = `${this.generationOptions.temperature}%`;
+    
+    slider.addEventListener('input', (e) => {
+      this.generationOptions.temperature = parseInt(e.target.value);
+      valueDisplay.textContent = `${this.generationOptions.temperature}%`;
+    });
+    
+    container.appendChild(label);
+    container.appendChild(slider);
+    container.appendChild(valueDisplay);
+    
+    return container;
   }
 }
 
