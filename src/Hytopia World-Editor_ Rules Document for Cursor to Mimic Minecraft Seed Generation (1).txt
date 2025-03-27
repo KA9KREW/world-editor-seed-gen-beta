@@ -1,0 +1,498 @@
+﻿Hytopia World-Editor: Rules Document for Mimicking Minecraft Seed Generation
+Purpose
+This document provides a detailed, step-by-step set of rules for Cursor (or any AI tool) to generate procedural worlds in the Hytopia World-Editor that mimic Minecraft's "nice" seeds. The goal is to create diverse, natural, and explorable worlds with proper terrain flow, biome variety, water features, caves, ores, and surface features, while ensuring compatibility with Hytopia's constraints and requirements.
+Project Context
+Platform: Hytopia World-Editor, a React application using Three.js for 3D rendering.
+
+Rules for Mimicking Minecraft Seed Generation
+Step 1: Seed Initialization
+Rule 1.1: Convert Seed to Numeric Value
+Action: Convert the input seed (string or number) into a 64-bit integer for deterministic generation.
+
+Implementation:
+If the seed is a string, hash it using a polynomial rolling hash: seed.split('').reduce((acc, char) => (acc * 31 + char.charCodeAt(0)) & 0xFFFFFFFF, 0).
+
+If the seed is a number, use parseInt(seed).
+
+Store the result as seedNum.
+
+Reason: Ensures consistent generation across platforms, mirroring Minecraft's Random class.
+
+Rule 1.2: Apply Offsets for Noise Maps
+Action: Use seedNum with unique offsets for each noise map to avoid correlation.
+
+Implementation:
+Base terrain: seedNum.
+
+Biome maps: seedNum + 7 (temperature), seedNum + 8 (humidity).
+
+Caves: seedNum + 2 (small), seedNum + 3 (large).
+
+Water: seedNum + 5 (rivers), seedNum + 9 (lakes).
+
+Ores: seedNum + 4.
+
+Reason: Prevents overlapping noise patterns, ensuring variety in features.
+
+Step 2: Initialize World Settings
+Rule 2.1: Define World Parameters
+Action: Set world dimensions and parameters based on UI inputs, with defaults for robustness.
+
+Implementation:
+width: Math.max(10, Math.min(options.width || 200, 1000)).
+
+length: Math.max(10, Math.min(options.length || 200, 1000)).
+
+clearMap: options.clearMap || true.
+
+caveDensity: (options.caveDensity || 50) / 250 (range 0 to 0.4, default 0.2).
+
+biomeDiversity: 0.02 / (1 + ((options.biomeSize || 100) / 200)) (range 0.01 to 0.05, default 0.02).
+
+roughness: 0.5 + ((options.mountainHeight || 100) / 100) * 2.0 (range 0.5 to 2.5, default 1.0).
+
+seaLevel: 20 + ((options.waterLevel || 50) / 100) * 20 (range 20 to 40, default 32).
+
+flatnessFactor: (options.terrainFlatness || 15) / 100 * 0.3 (range 0 to 0.3, default 0.15).
+
+oreRarity: 0.83 - ((options.oreDensity || 50) / 1000) (range 0.73 to 0.83, default 0.78).
+
+generateOres: options.generateOreDeposits !== false (default true).
+
+scale: 0.03 * (1000 / Math.max(options.width || 200, options.length || 200)) (scales noise for world size).
+
+smoothing: 0.5 (increased for smoother terrain).
+
+terrainBlend: 0.5.
+
+riverFreq: 0.05.
+
+Reason: Ensures scalability and user control, aligning with Minecraft's adjustable world settings.
+
+Rule 2.2: Clear Existing Terrain
+Action: Clear the current terrain if settings.clearMap is true.
+
+Implementation:
+Call clearMap() to reset terrainRef.current.
+
+Reason: Starts with a clean slate, as Minecraft does for new worlds.
+
+Rule 2.3: Initialize Block Types Mapping
+Action: Map block names to IDs using getBlockTypes().
+
+Implementation:
+Define blockTypes as an object with keys like sand, stone, etc., mapping to IDs from getBlockTypes().
+
+Example: sand: blockTypesList.find(b => b.name.toLowerCase() === 'sand')?.id || 12.
+
+Ensure all required blocks (water-still, water-flow, oak leaves) are correctly mapped.
+
+Reason: Ensures consistent block usage, mirroring Minecraft's block ID system.
+
+Step 3: Generate Base Terrain with Layered Noise
+Rule 3.1: Create Layered Heightmap
+Action: Generate a 2D heightmap using multiple Perlin noise layers (continental, hill, detail) and a depth map.
+
+Implementation:
+Continental Noise: generatePerlinNoise(settings.width, settings.length, { octaveCount: 1, scale: settings.scale * 0.5, persistence: 0.5, amplitude: 1.0, seed: seedNum }).
+
+Hill Noise: generatePerlinNoise(settings.width, settings.length, { octaveCount: 3, scale: settings.scale * 2, persistence: 0.5, amplitude: 0.5, seed: seedNum + 1 }).
+
+Detail Noise: generatePerlinNoise(settings.width, settings.length, { octaveCount: 5, scale: settings.scale * 4, persistence: 0.5, amplitude: 0.2, seed: seedNum + 2 }).
+
+Depth Map: generatePerlinNoise(settings.width, settings.length, { octaveCount: 2, scale: 0.02, persistence: 0.5, amplitude: 1.0, seed: seedNum + 6 }).
+
+Combine: heightMap[index] = (continentalNoise[index] + hillNoise[index] + detailNoise[index]) / 1.7 * (1.0 + depthMap[index] * 0.5).
+
+Reason: Mimics Minecraft's layered noise for natural terrain hierarchy.
+
+Rule 3.2: Smooth the Heightmap
+Action: Apply a smoothing pass to reduce blockiness.
+
+Implementation:
+Use a weighted average over a radius (e.g., radius = Math.floor(2 + settings.terrainBlend * 2)).
+
+Blend: smoothedHeightMap[z * settings.width + x] = total / count * settings.smoothing + heightMap[z * settings.width + x] * (1 - settings.smoothing).
+
+Reason: Ensures gradual terrain transitions, as Minecraft does.
+
+Rule 3.3: Apply Erosion Pass
+Action: Simulate erosion to smooth peaks and valleys.
+
+Implementation:
+For each block, compare with neighbors and adjust height to limit steep slopes:
+javascript
+
+let height = Math.floor(36 + heightMap[z * settings.width + x] * 28 * settings.roughness);
+for (let dx = -1; dx <= 1; dx++) {
+    for (let dz = -1; dz <= 1; dz++) {
+        let nx = x + dx, nz = z + dz;
+        if (nx >= 0 && nx < settings.width && nz >= 0 && nz < settings.length) {
+            let neighborHeight = Math.floor(36 + heightMap[nz * settings.width + nx] * 28 * settings.roughness);
+            if (neighborHeight < height - 1) {
+                height = Math.max(height - 1, neighborHeight + 1);
+            }
+        }
+    }
+}
+heightMap[z * settings.width + x] = (height - 36) / 28 / settings.roughness;
+
+Reason: Creates walkable terrain with natural slopes, as in Minecraft.
+
+Step 4: Assign Biomes with Climate Zones
+Rule 4.1: Generate Climate Maps
+Action: Create temperature and humidity maps to assign biomes.
+
+Implementation:
+Temperature Map: generatePerlinNoise(settings.width, settings.length, { octaveCount: 1, scale: 0.005, persistence: 0.5, amplitude: 1.0, seed: seedNum + 7 }).
+
+Humidity Map: generatePerlinNoise(settings.width, settings.length, { octaveCount: 1, scale: 0.005, persistence: 0.5, amplitude: 1.0, seed: seedNum + 8 }).
+
+Reason: Mimics Minecraft's climate-based biome system.
+
+Rule 4.2: Assign Biomes
+Action: Use temperature and humidity to assign biomes (desert, plains, forest, savanna).
+
+Implementation:
+For each (x, z):
+javascript
+
+let temp = tempMap[z * settings.width + x];
+let humidity = humidityMap[z * settings.width + x];
+if (temp < 0.3 && humidity < 0.5) {
+    biomeMap[z * settings.width + x] = 'desert';
+} else if (temp < 0.6) {
+    biomeMap[z * settings.width + x] = 'plains';
+} else if (temp < 0.8 && humidity > 0.6) {
+    biomeMap[z * settings.width + x] = 'forest';
+} else if (temp > 0.6 && humidity < 0.4) {
+    biomeMap[z * settings.width + x] = 'savanna';
+} else {
+    biomeMap[z * settings.width + x] = 'plains';
+}
+
+Reason: Creates diverse biomes with logical transitions.
+
+Rule 4.3: Adjust Terrain Based on Biome
+Action: Modify heightmap based on biome (e.g., forests hillier, deserts flatter).
+
+Implementation:
+Define biomeAdjust: biome === 'desert' ? 0.7 : (biome === 'forest' ? 1.2 : (biome === 'savanna' ? 1.1 : 1.0)).
+
+Apply: height = Math.floor(height * biomeAdjust).
+
+Reason: Enhances biome-specific terrain, as in Minecraft.
+
+Step 5: Generate Terrain Layers
+Rule 5.1: Calculate World Coordinates
+Action: Map (x, z) indices to world coordinates centered at (0, 0).
+
+Implementation:
+startX = -Math.floor(settings.width / 2).
+
+startZ = -Math.floor(settings.length / 2).
+
+worldX = startX + x, worldZ = startZ + z.
+
+Reason: Centers the world, matching Minecraft's coordinate system.
+
+Rule 5.2: Apply Heightmap with Constraints
+Action: Scale the heightmap to Y=0-64, with constraints for peaks and valleys.
+
+Implementation:
+height = Math.floor(36 + heightMap[z * settings.width + x] * 28 * settings.roughness).
+
+If heightMap[z * settings.width + x] > 0.7, amplify: height = Math.min(settings.maxHeight - 1, height * (1.5 * (settings.roughness + 0.5))).
+
+If heightMap[z * settings.width + x] < 0.3, lower: height = Math.max(5, height * 0.8).
+
+Apply biome adjustment: height = Math.floor(height * biomeAdjust).
+
+Reason: Creates varied terrain heights, as in Minecraft.
+
+Rule 5.3: Build Terrain Layers
+Action: Populate the terrain from Y=0 to height with appropriate blocks.
+
+Implementation:
+Y=0: blockTypes.lava (bedrock).
+
+Y=1 to height-4 (up to Y=60): blockTypes.stone.
+
+Y=height-4 to height-1: Transition layer (blockTypes.dirt, occasional blockTypes.clay or blockTypes.sandstone in deserts).
+
+Y=height: Surface block (blockTypes.grass for plains/forest, blockTypes.sand or blockTypes['sand-light'] for desert/savanna).
+
+Reason: Mimics Minecraft's layered terrain (bedrock, stone, dirt, grass/sand).
+
+Step 6: Carve Water Features
+Rule 6.1: Generate Water Noise Maps
+Action: Create separate noise maps for rivers and lakes.
+
+Implementation:
+River Noise: generatePerlinNoise(settings.width, settings.length, { octaveCount: 1, scale: 0.01 + settings.riverFreq, persistence: 0.5, amplitude: 1.0, seed: seedNum + 5 }).
+
+Lake Noise: generatePerlinNoise(settings.width, settings.length, { octaveCount: 1, scale: 0.02, persistence: 0.5, amplitude: 1.0, seed: seedNum + 9 }).
+
+Reason: Ensures distinct water features, avoiding overlap with other systems.
+
+Rule 6.2: Carve Rivers
+Action: Identify river paths and carve channels with variable depth and width.
+
+Implementation:
+For riverVal > 0.45 && riverVal < 0.55:
+Depth: riverDepth = Math.floor(1 + Math.random() * 2).
+
+Water height: waterHeight = Math.max(settings.seaLevel - riverDepth, 5).
+
+Carve: Remove blocks from waterHeight to height.
+
+Place water: terrainData[${worldX},${waterHeight},${worldZ}] = blockTypes['water-still'].
+
+Widen: Expand 2 blocks in each direction with probability decreasing with distance.
+
+Smooth banks: Replace adjacent blocks with blockTypes.sand or blockTypes.dirt.
+
+Reason: Creates natural, flowing rivers with smooth edges.
+
+Rule 6.3: Carve Lakes/Basins
+Action: Create lakes in depressions below sea level.
+
+Implementation:
+For lakeVal < 0.3 && height < settings.seaLevel + 5:
+Depth: lakeDepth = Math.floor(1 + Math.random() * 2).
+
+Water height: waterHeight = Math.max(height - lakeDepth, 5).
+
+Carve: Remove blocks from waterHeight to height.
+
+Place water: terrainData[${worldX},${waterHeight},${worldZ}] = blockTypes['water-still'].
+
+Expand: Random radius (1-3 blocks) with decreasing probability.
+
+Smooth shores: Replace adjacent blocks with blockTypes.sand or blockTypes.dirt.
+
+Reason: Adds natural lake formations, as in Minecraft.
+
+Rule 6.4: Create Oceans
+Action: Fill areas below sea level with water, adding beaches.
+
+Implementation:
+If height < settings.seaLevel:
+Fill: terrainData[${worldX},${y},${worldZ}] = blockTypes['water-still'] for y from height + 1 to settings.seaLevel.
+
+Add beaches: Replace blocks at height within settings.seaLevel - 2 to settings.seaLevel + 1 with blockTypes.sand or blockTypes['sand-light'].
+
+Reason: Mimics Minecraft's ocean generation with natural shorelines.
+
+Step 7: Carve Caves
+Rule 7.1: Generate Cave Noise Maps
+Action: Create 3D noise maps for caves.
+
+Implementation:
+Small Cave noise - for tunnel systems: generatePerlinNoise3D(settings.width, settings.maxHeight, settings.length, { 
+  octaveCount: 2, 
+  scale: 0.03, 
+  persistence: 0.5, 
+  amplitude: 1.0, 
+  seed: seedNum + 2 
+});
+
+Large Cave noise - for larger caverns: generatePerlinNoise3D(settings.width, settings.maxHeight, settings.length, { 
+  octaveCount: 2, 
+  scale: 0.06, 
+  persistence: 0.5, 
+  amplitude: 1.0, 
+  seed: seedNum + 3 
+});
+
+Reason: Provides varied cave sizes, mirroring Minecraft's spaghetti and cheese caves.
+
+Rule 7.2: Carve Caves
+Action: Remove blocks to form caves, with depth-based variation.
+
+Implementation:
+For Y=5 to 60, if block is stone:
+Threshold: caveThreshold = 0.3 + settings.caveDensity * 2.0 * (Math.min(settings.width, settings.length) / 200) - ((y / 60) * 0.5).
+
+Carve: If caveValSmall < caveThreshold or (y > 20 && y < 40 && caveValLarge < caveThreshold * 0.8), and y > 5 && y < height - 5, remove block.
+
+Lava: If y < 10 and (caveValSmall > 0.9 || caveValLarge > 0.9), place blockTypes.lava.
+
+Reason: Creates a network of tunnels and caverns, as in Minecraft.
+
+Rule 7.3: Add Underground Lakes
+Action: Place water or lava lakes in deep caves.
+
+Implementation:
+During cave carving, if y < height * 0.4 and Math.random() < 0.2:
+Place blockTypes.lava if y < height * 0.25, else blockTypes['water-still'].
+
+Expand 1 block in each direction.
+
+Reason: Enhances cave exploration, mimicking Minecraft's underground lakes.
+
+Step 8: Place Ores (Separate from Water)
+Rule 8.1: Generate Ore Noise Map
+Action: Create a 3D noise map for ore placement.
+
+Implementation:
+oreNoise = generatePerlinNoise(settings.width, settings.maxHeight, settings.length, { octaveCount: 1, scale: 0.04, persistence: 0.5, amplitude: 1.0, seed: seedNum + 4 }).
+
+Reason: Ensures independent ore placement.
+
+Rule 8.2: Place Ores in Stone Only
+Action: Place ores in stone blocks, avoiding water and air.
+
+Implementation:
+For Y=5 to 50, if terrainData[key] === blockTypes.stone:
+Coal: oreVal > settings.oreRarity + 0.12 && y <= 40.
+
+Iron: oreVal > settings.oreRarity + 0.07 && y <= 35.
+
+Gold: oreVal > settings.oreRarity + 0.04 && y <= 20.
+
+Emerald: oreVal > settings.oreRarity + 0.02 && y <= 30.
+
+Diamond: oreVal > settings.oreRarity && y <= 15.
+
+Cluster: Expand to adjacent stone blocks with 30% chance.
+
+Reason: Prevents ore placement in water, addressing the overlap issue.
+
+Step 9: Place Surface Features and Biome-Specific Elements
+Rule 9.1: Place Trees
+Action: Add trees in forest and plains biomes with varied sizes.
+
+Implementation:
+For biome === 'forest' and heightMap[z * settings.width + x] > 0.6 with 70% chance:
+Tree height: 4-6 blocks.
+
+Canopy radius: 1-2 blocks, sparse at edges.
+
+Place blockTypes.log for trunk, blockTypes['oak leaves'] for canopy.
+
+Reason: Mimics Minecraft's forest generation.
+
+Rule 9.2: Add Biome-Specific Features
+Action: Place features like sandstone in deserts.
+
+Implementation:
+For biome === 'desert' with 10% chance: Place blockTypes['sandstone'] at height + 1.
+
+Reason: Enhances biome diversity, as in Minecraft.
+
+Step 10: Finalize and Optimize
+Rule 10.1: Update Terrain
+Action: Apply the generated terrain to the scene.
+
+Implementation:
+Call updateTerrainFromToolBar(terrainData).
+
+Reason: Renders the world using Hytopia's chunk-based system.
+
+Rule 10.2: Optimize for Performance
+Action: Ensure efficient generation for large worlds.
+
+Implementation:
+Use chunk-based rendering (handled by buildUpdateTerrain).
+
+Adjust batch sizes: INITIAL_BATCH_SIZE = 200000, BATCH_SIZE = 50, SPATIAL_HASH_BATCH_SIZE = 200000.
+
+Reason: Supports 1000x1000 worlds without performance issues.
+
+Additional Guidelines for Cursor
+Guideline 1: Maintain Order
+Rule: Follow the exact order of steps (1-10) to ensure proper layering (e.g., water before ores, caves after water).
+
+Reason: Prevents issues like ore overlap with water or unnatural terrain features.
+
+Guideline 2: Avoid Overlapping Features
+Rule: Ensure each feature (water, caves, ores) uses independent noise maps and checks existing terrain (e.g., ores only in stone).
+
+Reason: Mimics Minecraft's separation of features.
+
+Guideline 3: Test with Various Inputs
+Rule: Test with different seeds, world sizes (10x10, 200x200, 1000x1000), and UI settings.
+
+Reason: Ensures robustness and scalability.
+
+Guideline 4: Debug Block Mapping
+Rule: Log blockTypes mapping and verify IDs (e.g., console.log("Oak Leaves ID:", blockTypes['oak leaves']);).
+
+Reason: Ensures correct block usage, especially for oak leaves and water blocks.
+
+Guideline 5: Enhance Visual Debugging
+Rule: Add console logs for each step (e.g., "Generating heightmap...", "Carving rivers...") to track progress.
+
+Reason: Helps identify where issues occur during generation.
+
+Expected Outcomes
+Following these rules should produce Hytopia worlds with:
+Natural Terrain: Rolling hills, valleys, and smooth slopes.
+
+Diverse Biomes: Desert, plains, forest, savanna with logical transitions.
+
+Water Features: Curved rivers, rounded lakes, oceans with beaches.
+
+Caves: Spaghetti tunnels, large caverns, and underground lakes.
+
+Ores: Placed only in stone, avoiding water.
+
+Surface Features: Varied trees and biome-specific elements.
+
+Scalability: Efficient generation for 10x10 to 1000x1000 worlds.
+
+function generate3DDensityField(width, height, length, settings, seedNum) {
+  // Generate base 3D noise for continentalness
+  const continentalnessNoise = generatePerlinNoise3D(width, height, length, {
+    octaveCount: 2,
+    scale: settings.scale * 0.5,
+    persistence: 0.7,
+    amplitude: 1.0,
+    seed: seedNum
+  });
+  
+  // Generate noise for peaks and valleys
+  const peakValleyNoise = generatePerlinNoise3D(width, height, length, {
+    octaveCount: 4,
+    scale: settings.scale * 2,
+    persistence: 0.5,
+    amplitude: 0.8,
+    seed: seedNum + 1
+  });
+  
+  // Generate noise for erosion
+  const erosionNoise = generatePerlinNoise3D(width, height, length, {
+    octaveCount: 2,
+    scale: settings.scale * 4,
+    persistence: 0.3,
+    amplitude: 0.4,
+    seed: seedNum + 2
+  });
+  
+  // Combine into density field
+  const densityField = new Float32Array(width * height * length);
+  
+  for (let z = 0; z < length; z++) {
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const idx = (z * width * height) + (y * width) + x;
+        
+        // Base terrain shape - decreases with height (creates surface)
+        const heightGradient = 1.0 - (y / (height * 0.8));
+        
+        // Combined noise
+        const combinedNoise = 
+          continentalnessNoise[idx] * 0.5 +
+          peakValleyNoise[idx] * 0.35 +
+          erosionNoise[idx] * 0.15;
+        
+        // Final density (positive = solid, negative = air)
+        densityField[idx] = heightGradient + combinedNoise * settings.roughness - 0.1;
+      }
+    }
+  }
+  
+  return densityField;
+}
+
