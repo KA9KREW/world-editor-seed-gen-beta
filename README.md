@@ -1,83 +1,80 @@
-# HYTPIA World Editor
+# World Editor with Advanced Terrain Generation (Beta)
 
-<p align="center">
-<img width="500" alt="Screenshot 2025-03-04 at 1 51 53 PM" src="https://github.com/user-attachments/assets/b3ca4a7c-cdfc-41c6-a35c-445735dfe837" />
-</p>
+## 🌎 Overview
+A powerful world editor with procedural terrain generation capabilities, designed to create diverse and realistic landscapes. Currently in beta development.
 
-This repository contains the HYTOPIA World Editor, available for use at https://build.hytopia.com - it is intentionally open sourced to allow community members to actively contribute to its development. We encourage community members to take an active role if interested in forking this repository, and submitting new features & solutions via pull requests. All merged pull requests will deploy to https://build.hytopia.com for the greater community to use.
+## 🏔️ Terrain Generation Features
 
-## Get Paid To Add Features And Fix Bugs! (OFFICIAL PAID BOUNTY SYSTEM)
-Bounties are requests for bug fixes, refactors, or feature additions that meet certain criteria and are submitted as a pull request. The HYTOPIA team will review your PR relative to the bounty you're submitting it for, and if your PR is accepted, the designated bounty for the request will be awarded.
+### Biome System
+- Plains
+- Forests
+- Deserts
+- Savanna
+- Ocean
+- Custom biome transitions with smooth blending
 
-Additionally! If you have found a bug, issue with the world editor, or believe a specific feature would be valuable, you can [submit it via a Github issue here](https://github.com/hytopiagg/world-editor/issues). 
+### Terrain Features
+- Natural rocky formations with cobblestone outcrops
+- Varied elevation with hills and valleys
+- Cave systems and underground structures
+- Rivers and lakes with natural pooling
+- Snow-capped mountain ranges
+- Natural beaches and shorelines
 
-If your issue, request or bug is escalated by our team to become a bounty, you will be included in the official bounty issue, and receive 10% of the total bounty amount after you or another developer submits a pull request we deem acceptable to fulfill the bounty. That means, if a bounty is escalated and has a $500 reward, you as the submitter would receive $50, the developer whos PR is accepted for the bounty would receive $500. Bounty payments are distributed by the HYTOPIA team via PayPal.
+### Surface Features
+- Realistic tree placement with varying densities per biome
+- Natural grass and vegetation distribution
+- Desert structures and sandstone formations
+- Ore deposits (coal, iron, gold, diamond, emerald)
 
-[You can find a list of available bug, feature and refactor bounties that will be paid to the first participant to submit an accepted PR here](https://github.com/hytopiagg/world-editor/labels/BOUNTY)
+### Customization Options
+- Seed-based generation for reproducible worlds
+- Adjustable terrain parameters:
+  - Mountain height
+  - Water level
+  - Cave density
+  - Biome size
+  - Terrain flatness
+  - Ore distribution
+  - Rock formation frequency
 
-## Available Scripts
+## 🚧 Beta Status
+This project is currently in beta development. Features and functionality may change. Known aspects under development:
 
-In the project directory, you can run:
+- Performance optimization for larger worlds
+- Additional biome types
+- Enhanced cave system generation
+- More varied rock formations
+- Advanced river system generation
+- Expanded customization options
 
-### `npm start`
+## 🎮 Controls
+- Use the seed generator tool to create new worlds
+- Adjust sliders to customize terrain features
+- Real-time preview of changes
+- Undo/Redo support for terrain modifications
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+## 🔧 Technical Details
+- Built with Three.js for 3D rendering
+- Uses custom Perlin noise implementation for terrain generation
+- Implements efficient chunk-based terrain loading
+- Supports various block types and textures
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+## 📝 Notes
+- This is a beta version - expect regular updates and changes
+- Some features may be experimental
+- Performance may vary based on world size and complexity
+- Bug reports and feedback are welcome
 
-### `npm test`
+## 🚀 Future Development
+Planned features and improvements:
+- Enhanced biome diversity
+- More natural rock formations
+- Advanced weather systems
+- Improved terrain blending
+- Additional structure generation
+- Performance optimizations
+- Extended customization options
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
-
-### `npm run build`
-
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
-
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
-
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
-
-### `npm run eject`
-
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
-
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
-
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
-
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
-
-## Learn More
-
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
-
-To learn React, check out the [React documentation](https://reactjs.org/).
-
-### Code Splitting
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
-
-### Analyzing the Bundle Size
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
-
-### Making a Progressive Web App
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
-
-### Advanced Configuration
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
-
-### Deployment
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
-
-### `npm run build` fails to minify
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+## 🤝 Contributing
+This project is in active development. Contributions, suggestions, and feedback are welcome!
