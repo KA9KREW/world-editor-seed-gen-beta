@@ -1089,7 +1089,8 @@ class SeedGeneratorTool extends BaseTool {
       gold: this.findBlockTypeId(blockTypesList, 'gold-ore'),
       diamond: this.findBlockTypeId(blockTypesList, 'diamond-ore'),
       emerald: this.findBlockTypeId(blockTypesList, 'emerald-ore'),
-      snow: this.findBlockTypeId(blockTypesList, 'snow') || this.findBlockTypeId(blockTypesList, 'snow-block') || this.findBlockTypeId(blockTypesList, 'white-wool')
+      snow: this.findBlockTypeId(blockTypesList, 'snow') || this.findBlockTypeId(blockTypesList, 'snow-block') || this.findBlockTypeId(blockTypesList, 'white-wool'),
+      cactus: this.findBlockTypeId(blockTypesList, 'cactus')
     };
     
     // Log block types to verify IDs for key blocks

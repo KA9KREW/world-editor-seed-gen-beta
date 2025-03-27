@@ -1052,12 +1052,20 @@ export function generateHytopiaWorld(settings, seedNum, blockTypes, progressCall
   const treeOffsetX = Math.floor(Math.random() * 5);
   const treeOffsetZ = Math.floor(Math.random() * 5);
   
+  // Step 9: Add Trees and Vegetation
+  updateProgress('Adding trees and vegetation...', 85);
+  
+  // Add cacti in desert biomes first
+  // Use a random offset for cactus placement to avoid grid patterns
+  const cactusOffsetX = Math.floor(Math.random() * 7);
+  const cactusOffsetZ = Math.floor(Math.random() * 7);
+  
   for (let z = 0; z < settings.length; z++) {
     for (let x = 0; x < settings.width; x++) {
-      const index = z * settings.width + x;
       const worldX = startX + x;
       const worldZ = startZ + z;
-      const biome = biomeMap[index];
+      const biomeIndex = z * settings.width + x;
+      const biome = biomeMap[biomeIndex];
       
       // Get the surface height at this position
       let surfaceHeight = 0;
@@ -1069,32 +1077,98 @@ export function generateHytopiaWorld(settings, seedNum, blockTypes, progressCall
         }
       }
       
-      // Step 9.1: Place Trees
+      // Check if we're in a desert biome and the surface is sand
+      const surfaceBlock = terrainData[`${worldX},${surfaceHeight},${worldZ}`];
+      if (biome === 'desert' && surfaceHeight > 0 && 
+          (surfaceBlock === blockTypes.sand || surfaceBlock === blockTypes['sand-light'])) {
+        // Only place cacti on certain coordinates to avoid grid patterns
+        if ((x + cactusOffsetX) % 7 === 0 && (z + cactusOffsetZ) % 7 === 0) {
+          // Use a more natural distribution pattern
+          const noiseValue = Math.random();
+          const temp = tempMap[biomeIndex] + temperatureOffset;
+          
+          // Adjust probability based on temperature and noise
+          let cactusProbability = 0.2; // Base probability
+          if (temp > 0.8) {
+            cactusProbability = 0.35; // Higher chance in very hot areas
+          } else if (temp > 0.7) {
+            cactusProbability = 0.3; // Medium-high chance in hot areas
+          } else if (temp > 0.6) {
+            cactusProbability = 0.25; // Medium chance in warm areas
+          }
+          
+          // Add some randomness to prevent grid patterns
+          if (noiseValue < cactusProbability) {
+            const cactusHeight = 3 + Math.floor(Math.random() * 2); // Cactus height
+            
+            // Check if there's enough space for a cactus
+            let canPlaceCactus = true;
+            for (let ty = 1; ty <= cactusHeight; ty++) {
+              if (terrainData[`${worldX},${surfaceHeight + ty},${worldZ}`]) {
+                canPlaceCactus = false;
+                break;
+              }
+            }
+            
+            if (canPlaceCactus) {
+              // Place cactus
+              for (let ty = 1; ty <= cactusHeight; ty++) {
+                terrainData[`${worldX},${surfaceHeight + ty},${worldZ}`] = blockTypes.cactus;
+                blocksCount++;
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+  
+  // Then add trees in non-desert biomes
+  for (let z = 0; z < settings.length; z++) {
+    for (let x = 0; x < settings.width; x++) {
+      const worldX = startX + x;
+      const worldZ = startZ + z;
+      const biomeIndex = z * settings.width + x;
+      const biome = biomeMap[biomeIndex];
+      
+      // Get the surface height at this position
+      let surfaceHeight = 0;
+      for (let y = settings.maxHeight - 1; y >= 0; y--) {
+        if (terrainData[`${worldX},${y},${worldZ}`] && 
+            terrainData[`${worldX},${y},${worldZ}`] !== blockTypes['water-still']) {
+          surfaceHeight = y;
+          break;
+        }
+      }
+      
+      // Skip desert biomes and sand blocks for trees
+      if (biome === 'desert') continue;
+      
       // Only place trees on certain coordinates to avoid grid patterns
       if ((x + treeOffsetX) % 5 === 0 && (z + treeOffsetZ) % 5 === 0) {
-        let treeProbability = 0;
-        
-        // Different tree densities per biome
-        if (biome === 'forest') {
-          treeProbability = 0.7;
-        } else if (biome === 'plains') {
-          treeProbability = 0.2;
-        } else if (biome === 'savanna') {
-          treeProbability = 0.3;
-        } else if (biome === 'snowy_plains' || biome === 'snowy_forest' || biome === 'snowy_taiga') {
-          treeProbability = 0.4; // Add tree probability for snowy biomes
+        // Check if the surface block is sand - if so, skip tree placement
+        const surfaceBlock = terrainData[`${worldX},${surfaceHeight},${worldZ}`];
+        if (surfaceBlock === blockTypes.sand || surfaceBlock === blockTypes['sand-light']) {
+          continue;
         }
         
-        // Check if we should place a tree here
-        if (Math.random() < treeProbability && surfaceHeight > worldSettings.seaLevel && surfaceHeight > 0) {
-          // Tree height varies by biome
-          let treeHeight = 4;
-          if (biome === 'forest') {
-            treeHeight = 4 + Math.floor(Math.random() * 3);
-          } else if (biome === 'savanna') {
-            treeHeight = 5 + Math.floor(Math.random() * 2);
+        // Place trees with varying probabilities based on biome
+        let treeProbability = 0.1; // Default low probability
+        if (biome === 'forest' || biome === 'taiga') {
+          treeProbability = 0.3; // Higher probability in forests
+        } else if (biome === 'plains' || biome === 'savanna') {
+          treeProbability = 0.15; // Medium probability in plains
+        } else if (biome === 'snowy_forest' || biome === 'snowy_taiga') {
+          treeProbability = 0.25; // Medium-high probability in snowy forests
+        }
+        
+        if (Math.random() < treeProbability) {
+          // Determine tree height based on biome
+          let treeHeight = 4 + Math.floor(Math.random() * 2); // Default height
+          if (biome === 'savanna') {
+            treeHeight = 5 + Math.floor(Math.random() * 2); // Taller trees in savanna
           } else if (biome === 'snowy_plains' || biome === 'snowy_forest' || biome === 'snowy_taiga') {
-            treeHeight = 3 + Math.floor(Math.random() * 3); // Slightly shorter trees for snowy biomes
+            treeHeight = 3 + Math.floor(Math.random() * 2); // Shorter trees in snowy biomes
           }
           
           // Check if there's enough space for a tree
@@ -1107,78 +1181,71 @@ export function generateHytopiaWorld(settings, seedNum, blockTypes, progressCall
           }
           
           if (canPlaceTree) {
-            // Place trunk - use poplar log only for snowy biomes
-            const logType = (biome === 'snowy_plains' || biome === 'snowy_forest' || biome === 'snowy_taiga') 
+            // Place trunk - use poplar log for snowy biomes, regular log for others
+            const logType = (biome === 'snowy_plains' || biome === 'snowy_forest' || biome === 'snowy_taiga')
               ? blockTypes['poplar log'] 
-              : blockTypes.log;
-              
-            // Debug logging
-            if (biome === 'snowy_plains' || biome === 'snowy_forest' || biome === 'snowy_taiga') {
-              console.log('Snowy biome tree:', {
-                biome,
-                poplarLogId: blockTypes['poplar log'],
-                logId: blockTypes.log,
-                usingLogType: logType
-              });
-            }
+              : (biome === 'desert' ? blockTypes.cactus : blockTypes.log);
             
             for (let ty = 1; ty <= treeHeight; ty++) {
               terrainData[`${worldX},${surfaceHeight + ty},${worldZ}`] = logType;
               blocksCount++;
             }
             
-            // Place leaves (more complex canopy)
-            // Different leaf patterns per biome
-            let leafRadius = 2;
-            if (biome === 'savanna') {
-              leafRadius = 3; // Wider canopy for savanna
-            } else if (biome === 'snowy_plains' || biome === 'snowy_forest' || biome === 'snowy_taiga') {
-              leafRadius = 2; // Standard canopy for snowy trees
-            }
-            
-            for (let ly = treeHeight - 1; ly <= treeHeight + 1; ly++) {
-              const layerRadius = ly === treeHeight ? leafRadius : leafRadius - 1;
+            // Only place leaves for non-desert biomes
+            if (biome !== 'desert') {
+              // Place leaves (more complex canopy)
+              // Different leaf patterns per biome
+              let leafRadius = 2;
+              if (biome === 'savanna') {
+                leafRadius = 3; // Wider canopy for savanna
+              } else if (biome === 'snowy_plains' || biome === 'snowy_forest' || biome === 'snowy_taiga') {
+                leafRadius = 2; // Standard canopy for snowy trees
+              }
               
-              for (let lx = -layerRadius; lx <= layerRadius; lx++) {
-                for (let lz = -layerRadius; lz <= layerRadius; lz++) {
-                  // Skip trunk position
-                  if (lx === 0 && lz === 0 && ly < treeHeight) continue;
-                  
-                  // Calculate distance from trunk
-                  const dist = Math.sqrt(lx * lx + lz * lz + (ly - treeHeight) * (ly - treeHeight) * 0.5);
-                  
-                  // Place leaves based on distance (sparser at edges)
-                  if (dist <= layerRadius || (dist <= layerRadius + 0.5 && Math.random() < 0.5)) {
-                    const leafKey = `${worldX + lx},${surfaceHeight + ly},${worldZ + lz}`;
-                    if (!terrainData[leafKey]) {
-                      // Use cold leaves for snowy biomes, oak leaves for all others
-                      const leafType = (biome === 'snowy_plains' || biome === 'snowy_forest' || biome === 'snowy_taiga')
-                        ? blockTypes['cold-leaves']
-                        : blockTypes['oak-leaves'];
-                      terrainData[leafKey] = leafType;
-                      blocksCount++;
+              for (let ly = treeHeight - 1; ly <= treeHeight + 1; ly++) {
+                const layerRadius = ly === treeHeight ? leafRadius : leafRadius - 1;
+                
+                for (let lx = -layerRadius; lx <= layerRadius; lx++) {
+                  for (let lz = -layerRadius; lz <= layerRadius; lz++) {
+                    // Skip trunk position
+                    if (lx === 0 && lz === 0 && ly < treeHeight) continue;
+                    
+                    // Calculate distance from trunk
+                    const dist = Math.sqrt(lx * lx + lz * lz + (ly - treeHeight) * (ly - treeHeight) * 0.5);
+                    
+                    // Place leaves based on distance (sparser at edges)
+                    if (dist <= layerRadius || (dist <= layerRadius + 0.5 && Math.random() < 0.5)) {
+                      const leafKey = `${worldX + lx},${surfaceHeight + ly},${worldZ + lz}`;
+                      if (!terrainData[leafKey]) {
+                        // Use cold leaves for snowy biomes, oak leaves for all others
+                        const leafType = (biome === 'snowy_plains' || biome === 'snowy_forest' || biome === 'snowy_taiga')
+                          ? blockTypes['cold-leaves']
+                          : blockTypes['oak-leaves'];
+                        terrainData[leafKey] = leafType;
+                        blocksCount++;
+                      }
                     }
                   }
                 }
               }
-            }
-            
-            // Add a few random leaves for natural variation
-            for (let i = 0; i < 5; i++) {
-              const lx = Math.floor(Math.random() * 5) - 2;
-              const ly = treeHeight + Math.floor(Math.random() * 3) - 1;
-              const lz = Math.floor(Math.random() * 5) - 2;
               
-              if (Math.abs(lx) <= leafRadius && Math.abs(lz) <= leafRadius && 
-                  ly >= treeHeight - 1 && ly <= treeHeight + 1) {
-                const leafKey = `${worldX + lx},${surfaceHeight + ly},${worldZ + lz}`;
-                if (!terrainData[leafKey]) {
-                  // Use cold leaves for snowy biomes, oak leaves for all others
-                  const leafType = (biome === 'snowy_plains' || biome === 'snowy_forest' || biome === 'snowy_taiga')
-                    ? blockTypes['cold-leaves']
-                    : blockTypes['oak-leaves'];
-                  terrainData[leafKey] = leafType;
-                  blocksCount++;
+              // Add a few random leaves for natural variation
+              for (let i = 0; i < 5; i++) {
+                const lx = Math.floor(Math.random() * 5) - 2;
+                const ly = treeHeight + Math.floor(Math.random() * 3) - 1;
+                const lz = Math.floor(Math.random() * 5) - 2;
+                
+                if (Math.abs(lx) <= leafRadius && Math.abs(lz) <= leafRadius && 
+                    ly >= treeHeight - 1 && ly <= treeHeight + 1) {
+                  const leafKey = `${worldX + lx},${surfaceHeight + ly},${worldZ + lz}`;
+                  if (!terrainData[leafKey]) {
+                    // Use cold leaves for snowy biomes, oak leaves for all others
+                    const leafType = (biome === 'snowy_plains' || biome === 'snowy_forest' || biome === 'snowy_taiga')
+                      ? blockTypes['cold-leaves']
+                      : blockTypes['oak-leaves'];
+                    terrainData[leafKey] = leafType;
+                    blocksCount++;
+                  }
                 }
               }
             }
